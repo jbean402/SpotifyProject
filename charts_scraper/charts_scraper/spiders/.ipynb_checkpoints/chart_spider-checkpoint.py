@@ -26,15 +26,24 @@ class ChartSpider (scrapy.Spider):
     
     def parse(self, response): 
         
-        # recording the country of the current page 
-        current_country = response.url.split("/")[2] 
+        # loop through the iterable links for each country 
+        for link in response.css('tr'):
+            
+            #gets the weekly html link 
+            weekly_link = response.css('td.mp.text > a:nth-child(3)::attr(href)').get() 
+            
+            if weekly_link: 
+                yield scrapy.follow(weekly_link, callback = self.parse_weekly(self, response)) 
+                
+    def parse_weekly(self, response): 
         
-        # getting all the country links for the current page 
-        weekly_country_links = self.link_extractor.extract_links(response)
+        # getting the rank, song name, artist name 
+        rank = response.css('td.np').get() 
+        song_name = response.css('tr > td.text.mp a:nth-child(2)::attr(href)').get()
+        artist_name = response.css('tr > td.text.mp a:first-child::attr(href)').get()
         
-        # getting the weekly links 
-        for links in weekly_country_links: 
-            add_url = response.css('tr > td.mp.text > a:nth-child(3)::attr(href)')
+                                    
+                                    
+                                
             
             
-        

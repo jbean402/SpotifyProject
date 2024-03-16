@@ -3,10 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import sqlite3
+import csv
 # Import your functions or ensure they are defined in this script
 # from your_module import collect_user_listening_data, recommend_countries
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+# from countries_sql import recommend_countries
 
 df = pd.read_csv('/Users/andrewhan/Desktop/2023-2024/Winter_24/PIC_Class/Project/TEST/country_charts.csv')
 df.head()
@@ -91,8 +93,22 @@ def collect_user_listening_data():
 
     return user_listening_data
 
+def collect_user_top_tracks():
+    # Initialize Spotipy with your client ID, client secret, and redirect URI
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=your_client_id,
+                                                    client_secret=your_client_secret,
+                                                    redirect_uri=your_redirect_uri,
+                                                    scope='user-library-read,user-top-read'))
+
+    # Fetch the user's top tracks
+    top_tracks = sp.current_user_top_tracks(time_range = 'short_term', limit=50)
+
+    # Extract just the top track names
+    top_track_names = [track['name'] for track in top_tracks['items']]
+
+    return top_track_names
+
 def recommend_countries(user_top_songs):
-    
     conn = sqlite3.connect('country_data.db')
     c = conn.cursor()
 
@@ -118,11 +134,23 @@ def recommend_countries(user_top_songs):
     # Calculate the country score as a percentage of how much the user's top songs match the top countries
     country_scores = {country: (country_counts[country] / total_top_country_occurrences) * 100 for country in top_countries}
     
+
+    with open('recommendations.csv', 'w', newline='') as csvfile:
+        fieldnames = ['Country', 'Score']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        
+        writer.writeheader()
+        for country in top_countries:
+            writer.writerow({'Country': country, 'Country Score': country_scores[country]})
+    
     return top_countries, country_scores
 
 # Ensure you have your Spotify API credentials set
 user_listening_data = collect_user_listening_data()
-recommended_countries = recommend_countries(user_listening_data)
+user_top_songs = collect_user_top_tracks()
+recommended_countries, country_scores = recommend_countries(user_top_songs)
+
+
 
 # Visualization 1: User's Top Artists
 plt.figure(figsize=(10, 6))
@@ -136,7 +164,7 @@ plt.show()
 
 # Visualization 2: User's Top Tracks
 plt.figure(figsize=(10, 6))
-sns.barplot(x=list(range(1, len(user_listening_data['top_tracks']) + 1)), y=user_listening_data['top_tracks'])
+sns.barplot(x=list(range(1, len(user_listening_data['top_tracks']) + 1)), y= user_top_songs)
 plt.title('Top Tracks')
 plt.xlabel('Rank')
 plt.ylabel('Track Name')
@@ -150,7 +178,7 @@ countries = recommended_countries  # Assuming this is a list of strings
 values = [1 for _ in countries]  # Just a dummy list to create a bar chart
 
 plt.figure(figsize=(8, 4))
-sns.barplot(x=countries, y=values)
+sns.barplot(x=recommended_countries, y=country_scores)
 plt.title('Recommended Countries Based on Listening History')
 plt.xlabel('Country')
 plt.ylabel('Recommendation Strength')

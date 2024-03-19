@@ -141,15 +141,16 @@ def recommend_countries(user_top_songs):
             country_name = country[0]
             country_counts[country_name] = country_counts.get(country_name, 0) + 1
 
-    total_country_occurrences = sum(country_counts.values())
+
+    # total_country_occurrences = sum(country_counts.values())
 
     top_countries = sorted(country_counts.keys(), key=country_counts.get, reverse=True)[:3]
     
-    country_scores = {country: (country_counts[country] / total_country_occurrences) * 100 for country in country_counts.keys()}
+    country_scores = {country: (country_counts[country] / 200) * (1 / max(country_scores.values()))* 100 for country in country_counts.keys()}
     
-    top_country_scores = {country: country_scores[country] for country in top_countries}
+    # top_country_scores = {country: country_scores[country] for country in top_countries}
 
-    return top_country_scores
+    return country_scores
 
 # Ensure you have your Spotify API credentials set
 user_listening_data = collect_user_listening_data()

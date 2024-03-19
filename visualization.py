@@ -8,26 +8,27 @@ import csv
 # from your_module import collect_user_listening_data, recommend_countries
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-# from countries_sql import recommend_countries
 
-df = pd.read_csv('/Users/andrewhan/Desktop/2023-2024/Winter_24/PIC_Class/Project/TEST/country_charts.csv')
+# repositioning df columns for sqlite table
+df = pd.read_csv('country_charts.csv')
+df = df [['country', 'song_title', 'artist_name', 'Pos']]
+df = df.rename(columns={'Pos': 'rank'})
+df['song_title'] = df['song_title'].str.strip()
 df.head()
-conn = sqlite3.connect('country_data.db')
 
-df.to_sql('country_data', conn, if_exists='replace', index=False)
+
 class DatabaseHandler:
     @staticmethod
     def create_database():
         conn = sqlite3.connect('country_data.db') #creates and connects to country_data.db database
         conn.close()
     
-
     @staticmethod
     def create_table():
         conn = sqlite3.connect('country_data.db')
         c = conn.cursor()
         c.execute('''
-            CREATE TABLE IF NOT EXISTS countries (
+            CREATE TABLE IF NOT EXISTS rank_data (
             country TEXT,
             song_name TEXT,
             artist_name TEXT,
@@ -40,34 +41,50 @@ class DatabaseHandler:
 # MULTI INDEX SQL
     @staticmethod
     def insert_data():
-        DatabaseHandler.create_database()
-        DatabaseHandler.create_table()
         conn = sqlite3.connect('country_data.db')
         c = conn.cursor()
-        c.execute('''
-            INSERT INTO countries (country, song_name, artist_name, rank)
-            SELECT country, song_name, artist_name, rank
-            FROM countries
-            WHERE (country, rank) IN (
-            SELECT country, MAX(rank)
-            FROM countries
-            GROUP BY country
-            )
-        ''')
-        conn.commit()
-        
-        #fetch data from the countries table
-        c.execute('''
-            SELECT c.country, c.song_name, c.artist_name, c.rank
-            FROM countries c
-            JOIN countries yt ON c.country = yt.country AND c.song_name = yt.song_name AND c.artist_name = yt.artist_name
-            ORDER BY c.country
-        ''')
+        df.to_sql('rank_data', conn, if_exists='replace', index=False)
+
 
         conn.commit()
         conn.close()
-
+        
+DatabaseHandler.create_table()
 DatabaseHandler.insert_data()
+
+
+def print_top_songs():
+    conn = sqlite3.connect('country_data.db')
+    c = conn.cursor()
+
+    # Query the database to retrieve all distinct country names
+    c.execute("SELECT DISTINCT song_title FROM rank_data")
+    songs = c.fetchall()
+
+    # Print the list of countries
+    for song in songs:
+        print(song)
+
+    # Close connection
+    conn.close()
+
+
+def print_countries():
+    conn = sqlite3.connect('country_data.db')
+    c = conn.cursor()
+
+    # Query the database to retrieve all distinct country names
+    c.execute("SELECT DISTINCT country FROM rank_data")
+    countries = c.fetchall()
+
+    # Print the list of countries
+    for country in countries:
+        print(country)
+
+    # Close connection
+    conn.close()
+
+# print_top_songs()
 
 
 your_client_id = '5073d5f2f848429a97f7e5fff17bd1aa'
@@ -113,9 +130,10 @@ def recommend_countries(user_top_songs):
     c = conn.cursor()
 
     country_counts = {}
+
     for song in user_top_songs:
         # Query the database to retrieve associated countries
-        c.execute("SELECT DISTINCT country FROM countries WHERE song_name = ?", (song,))
+        c.execute("SELECT DISTINCT country FROM rank_data WHERE song_title = ?", (song,))
         countries = c.fetchall()
         
         # Increment counts for each country
@@ -123,33 +141,28 @@ def recommend_countries(user_top_songs):
             country_name = country[0]
             country_counts[country_name] = country_counts.get(country_name, 0) + 1
     
-    # Close connection
-    conn.close()
-    
     # Recommend the country with the highest count
-    top_countries = sorted(country_counts, key=country_counts.get, reverse=True)[:3]
+    top_countries = sorted(country_counts.keys(), key=country_counts.get, reverse=True)[:3]
 
     total_top_country_occurrences = sum(country_counts[country] for country in top_countries)
     
     # Calculate the country score as a percentage of how much the user's top songs match the top countries
     country_scores = {country: (country_counts[country] / total_top_country_occurrences) * 100 for country in top_countries}
     
-
-    with open('recommendations.csv', 'w', newline='') as csvfile:
-        fieldnames = ['Country', 'Score']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        
-        writer.writeheader()
-        for country in top_countries:
-            writer.writerow({'Country': country, 'Country Score': country_scores[country]})
-    
-    return top_countries, country_scores
+    return country_scores
 
 # Ensure you have your Spotify API credentials set
 user_listening_data = collect_user_listening_data()
 user_top_songs = collect_user_top_tracks()
-recommended_countries, country_scores = recommend_countries(user_top_songs)
 
+country_scores = recommend_countries(user_top_songs)
+
+# print_top_songs()
+
+# print (f'User listening data: {user_listening_data}')
+# print (f'User top songs: {user_top_songs}')
+
+print (f'User country scores: {country_scores}')
 
 
 # Visualization 1: User's Top Artists
@@ -174,11 +187,9 @@ plt.show()
 
 # Visualization 3: Recommended Countries
 # Assuming recommended_countries is a list of country names
-countries = recommended_countries  # Assuming this is a list of strings
-values = [1 for _ in countries]  # Just a dummy list to create a bar chart
-
+countries = country_scores  # Assuming this is a list of strings
 plt.figure(figsize=(8, 4))
-sns.barplot(x=recommended_countries, y=country_scores)
+sns.barplot(x= list(country_scores.keys()), y=list(country_scores.values()))
 plt.title('Recommended Countries Based on Listening History')
 plt.xlabel('Country')
 plt.ylabel('Recommendation Strength')

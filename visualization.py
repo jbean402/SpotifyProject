@@ -10,7 +10,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
 # repositioning df columns for sqlite table
-df = pd.read_csv('country_charts.csv')
+df = pd.read_csv('/Users/andrewhan/Desktop/2023-2024/Winter_24/PIC_Class/Project/TEST/country_charts.csv')
 df = df [['country', 'song_title', 'artist_name', 'Pos']]
 df = df.rename(columns={'Pos': 'rank'})
 df['song_title'] = df['song_title'].str.strip()
@@ -140,16 +140,16 @@ def recommend_countries(user_top_songs):
         for country in countries:
             country_name = country[0]
             country_counts[country_name] = country_counts.get(country_name, 0) + 1
-    
-    # Recommend the country with the highest count
-    top_countries = sorted(country_counts.keys(), key=country_counts.get, reverse=True)[:3]
 
-    total_top_country_occurrences = sum(country_counts[country] for country in top_countries)
+    total_country_occurrences = sum(country_counts.values())
+
+    top_countries = sorted(country_counts.keys(), key=country_counts.get, reverse=True)[:3]
     
-    # Calculate the country score as a percentage of how much the user's top songs match the top countries
-    country_scores = {country: (country_counts[country] / total_top_country_occurrences) * 100 for country in top_countries}
+    country_scores = {country: (country_counts[country] / total_country_occurrences) * 100 for country in country_counts.keys()}
     
-    return country_scores
+    top_country_scores = {country: country_scores[country] for country in top_countries}
+
+    return top_country_scores
 
 # Ensure you have your Spotify API credentials set
 user_listening_data = collect_user_listening_data()

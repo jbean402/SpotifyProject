@@ -56,8 +56,6 @@ auth_query_parameters = {
     "client_id": CLIENT_ID
 }
 
-
-
 # ================ SQL DB ================
 
 import pandas as pd
@@ -69,7 +67,7 @@ global_data = None
 def download_csv():
     global global_df
     # Load the CSV file into the DataFrame
-    global_df = pd.read_csv('/Users/andrewhan/Desktop/2023-2024/Winter_24/PIC_Class/Project/country_charts.csv')
+    global_df = pd.read_csv('/Users/andrewhan/Desktop/2023-2024/Winter_24/PIC_Class/Project/TEST/country_charts.csv')
 
 download_csv()
 
@@ -167,7 +165,7 @@ user_top_songs = collect_user_top_tracks()
 IMAGE_DIR = 'static/images/'
 
 def top_songs_plot():
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 12))
     sns.barplot(x=list(range(1, len(user_listening_data['top_tracks']) + 1)), y= user_top_songs)
     plt.title('Top Tracks')
     plt.xlabel('Rank')
@@ -243,6 +241,7 @@ def index():
     auth_url = "{}/?{}".format(SPOTIFY_AUTH_URL, url_args)
     return redirect(auth_url)
 
+
 @app.route("/callback/q")
 def callback():
     # Auth Step 4: Requests refresh and access tokens
@@ -271,10 +270,7 @@ def callback():
     top_artists_path = os.path.join('images', 'top_artists_plot.png')
     top_tracks_path = os.path.join('images', 'top_tracks_plot.png')
     recommended_countries_path = os.path.join('images', 'recommended_countries_plot.png')
-    return render_template("index2.html",
-                           top_artists_path=top_artists_path,
-                           top_tracks_path=top_tracks_path,
-                           recommended_countries_path=recommended_countries_path)
+    return render_template("index2.html")
 
 @dash_app.callback(
     dash.dependencies.Output('top-artists-plot', 'figure'),
@@ -283,12 +279,9 @@ def callback():
     [dash.dependencies.Input('update-button', 'n_clicks')]
 )
 
-
-@app.route('/top-artists-plot')
-def top_artists():
-    return render_template('index2.html', image_path='images/top_artists_plot.png')
-
-
+# @app.route('/top-artists-plot')
+# def top_artists():
+#     return render_template('index2.html', image_path='images/top_artists_plot.png')
 
 def update_plots(n_clicks):
     # Collect updated data
@@ -343,11 +336,11 @@ def update_plots(n_clicks):
 
 dash_app.layout = html.Div([
     html.H1('Dash Plots'),
-    
     html.Div(id='top-artists-plot'),
     html.Div(id='top-tracks-plot'),
     html.Div(id='recommended-countries-plot')
 ])
+
 
 if __name__ == "__main__":
     initialize_database()

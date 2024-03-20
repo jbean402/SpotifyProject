@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login with Spotify</title>
+    <style>
+        h2 {
+            font-family: Georgia; 
+            text-align: center; 
+            color: #ffffff;
+            margin-bottom: 35px; 
+            margin-top: -40px;
+            font-size: 35px;
+        }
+        body {
+            font-family: Verdana;
+            background: linear-gradient(to right, #121212, #023d16, #121212);
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+        .login-button {
+            background-color: #535353;
+            color: #ffffff;
+            border: 0;
+            padding: 12px 32px;
+            font-size: 15px;
+            border-radius: 500px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+        }
+        .login-button:hover, .login-button:focus {
+            background-color: #838383;
+            outline: none;
+        }
+        .footer {
+            position: absolute;
+            bottom: 20px;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #1DB954;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+    </style>
+</head>
+<body>
+    <h2>PIC16B Project: Mapping User Listening Data to Countries</h2>
+    <form action="{{ url_for('login') }}" method="post">
+        <button type="submit" class="login-button">Login with Spotify</button>
+    </form>
+    <div class="footer">
+        <p>Powered by <a href="https://developer.spotify.com/documentation/web-api/" target="_blank">Spotify Web API</a></p>
+    </div>
+</body>
+</html>

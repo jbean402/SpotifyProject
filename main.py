@@ -127,7 +127,6 @@ def collect_user_listening_data():
         'top_artists': [artist['name'] for artist in top_artists['items']],
         'top_tracks': [track['name'] for track in top_tracks['items']]
     }
-
     return user_listening_data
 
 def collect_user_top_tracks():
@@ -157,12 +156,12 @@ def collect_user_top_artists():
     # Return just the top artists
     return top_artists
 
-user_listening_data = collect_user_listening_data()
-user_top_songs = collect_user_top_tracks()
-
 # ================ Data Visualizations ================
 
 IMAGE_DIR = 'static/images/'
+
+user_listening_data = collect_user_listening_data()
+user_top_songs = collect_user_top_tracks()
 
 def top_songs_plot():
     plt.figure(figsize=(10, 12))
@@ -232,8 +231,6 @@ def recommend_countries(user_top_songs):
 
 country_scores = recommend_countries(user_top_songs)
 
-
-
 @app.route("/")
 def index():
     # Auth Step 1: Authorization
@@ -265,11 +262,12 @@ def callback():
     # Auth Step 6: Use the access token to access Spotify API
     authorization_header = {"Authorization": "Bearer {}".format(access_token)}
 
+    user_listening_data = collect_user_listening_data()
+    user_top_songs = collect_user_top_tracks()
+    country_scores = recommend_countries(user_top_songs)
+
     generate_all_plots()
 
-    top_artists_path = os.path.join('images', 'top_artists_plot.png')
-    top_tracks_path = os.path.join('images', 'top_tracks_plot.png')
-    recommended_countries_path = os.path.join('images', 'recommended_countries_plot.png')
     return render_template("index2.html")
 
 @dash_app.callback(

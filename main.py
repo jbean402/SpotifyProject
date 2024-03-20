@@ -1,15 +1,17 @@
 import json
-from flask import Flask, request, redirect, g, render_template
+from flask import Flask, request, redirect, g, render_template, jsonify
 import requests
 from urllib.parse import quote
 
 #from visualization import collect_user_listening_data, collect_user_top_tracks, recommend_countries
-
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import base64
 from io import BytesIO
+import os
 
 import sqlite3
 import spotipy
@@ -18,7 +20,6 @@ from spotipy.oauth2 import SpotifyOAuth
 import dash
 from dash import dcc, html
 import plotly.graph_objs as go
-
 
 # Authentication Steps, paramaters, and responses are defined at https://developer.spotify.com/web-api/authorization-guide/
 # Visit this url to see all the steps, parameters, and expected response.
@@ -55,22 +56,63 @@ auth_query_parameters = {
     "client_id": CLIENT_ID
 }
 
-'''
-@app.route("/")
-def login():
-    return render_template("login.html")
 
-@app.route("/login", methods=["GET", "POST"])
-def authorize_spotify():
-    if request.method == "POST":
-        url_args = "&".join(["{}={}".format(key, quote(val)) for key, val in auth_query_parameters.items()])
-        auth_url = "{}?{}".format(SPOTIFY_AUTH_URL, url_args)
-        return redirect(auth_url)
+
+# ================ SQL DB ================
+
+import pandas as pd
+import sqlite3
+
+# allows computers of users of the website to access the top-songs csv file
+# loading in csv file
+global_data = None
+def download_csv():
+    global global_df
+    # Load the CSV file into the DataFrame
+    global_df = pd.read_csv('/Users/andrewhan/Desktop/2023-2024/Winter_24/PIC_Class/Project/country_charts.csv')
+
+download_csv()
+
+def get_global_data():
+    global global_df
+    # Check if global_df is not None
+    if global_df is not None:
+        # Convert the DataFrame to a dictionary
+        df_dict = global_df.to_dict(orient='records')
+        # Return the DataFrame as JSON
+        return jsonify(df_dict)
+
+def initialize_database():
+    #read csv, CHANGE FILE PATH!!!
+    if global_df is not None:
+        df = global_df
+        df = df [['country', 'song_title', 'artist_name', 'Pos']]
+        df = df.rename(columns={'Pos': 'rank'})
+        df['song_title'] = df['song_title'].str.strip()
+
     else:
-        # Handle GET request (if needed)
-        return render_template("login.html")
+        return 'global_df is not initialized'
 
-'''
+    #Create SQLite DB & Table
+    conn = sqlite3.connect('country_data.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS rank_data (
+        country TEXT,
+        song_name TEXT,
+        artist_name TEXT,
+        rank INTEGER
+        )
+    ''')
+    conn.commit()
+
+    #adding data from df into the sqlite table
+    df.to_sql('rank_data', conn, if_exists='replace', index=False)
+    conn.commit()
+    conn.close()
+
+# ================ Functions for gathering info from user ================
+
 def collect_user_listening_data():
     # Initialize Spotipy with your client ID, client secret, and redirect URI
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
@@ -105,6 +147,65 @@ def collect_user_top_tracks():
 
     return top_track_names
 
+def collect_user_top_artists():
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
+                                                    client_secret=CLIENT_SECRET,
+                                                    redirect_uri=REDIRECT_URI,
+                                                    scope='user-library-read,user-top-read'))
+
+    # Fetch the user's top tracks
+    top_artists = sp.current_user_top_artists(time_range = 'short_term', limit=15)
+
+    # Return just the top artists
+    return top_artists
+
+user_listening_data = collect_user_listening_data()
+user_top_songs = collect_user_top_tracks()
+
+# ================ Data Visualizations ================
+
+IMAGE_DIR = 'static/images/'
+
+def top_songs_plot():
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x=list(range(1, len(user_listening_data['top_tracks']) + 1)), y= user_top_songs)
+    plt.title('Top Tracks')
+    plt.xlabel('Rank')
+    plt.ylabel('Track Name')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(os.path.join(IMAGE_DIR, 'top_songs_plot.png'))
+
+def top_artists_plot():
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x=list(range(1, len(user_listening_data['top_artists']) + 1)), y=user_listening_data['top_artists'])
+    plt.title('Top Artists')
+    plt.xlabel('Rank')
+    plt.ylabel('Artist Name')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(os.path.join(IMAGE_DIR, 'top_artists_plot.png'))
+
+def top_countries_plot():
+    countries = country_scores  # Assuming this is a list of strings
+    plt.figure(figsize=(8, 4))
+    sns.barplot(x= list(country_scores.keys()), y=list(country_scores.values()))
+    plt.title('Recommended Countries Based on Listening History')
+    plt.xlabel('Country')
+    plt.ylabel('Recommendation Strength')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(os.path.join(IMAGE_DIR, 'top_countries_plot.png'))
+
+def generate_all_plots():
+    if not os.path.exists(IMAGE_DIR):
+        os.makedirs(IMAGE_DIR)
+
+    top_songs_plot()
+    top_artists_plot()
+    top_countries_plot()
+# ================ Country Recommendations ================
+
 def recommend_countries(user_top_songs):
     conn = sqlite3.connect('country_data.db')
     c = conn.cursor()
@@ -120,16 +221,19 @@ def recommend_countries(user_top_songs):
         for country in countries:
             country_name = country[0]
             country_counts[country_name] = country_counts.get(country_name, 0) + 1
-    
-    # Recommend the country with the highest count
-    top_countries = sorted(country_counts.keys(), key=country_counts.get, reverse=True)[:3]
 
-    total_top_country_occurrences = sum(country_counts[country] for country in top_countries)
+    max_score = max(country_counts.values())
+    top_countries = sorted(country_counts.keys(), key=country_counts.get, reverse=True)[:3]
     
-    # Calculate the country score as a percentage of how much the user's top songs match the top countries
-    country_scores = {country: (country_counts[country] / total_top_country_occurrences) * 100 for country in top_countries}
+    country_scores = {}
+    for country in top_countries:
+        score = (country_counts[country] / 200) * (1 / max_score) * 100
+        country_scores[country] = score
     
     return country_scores
+
+country_scores = recommend_countries(user_top_songs)
+
 
 
 @app.route("/")
@@ -139,7 +243,6 @@ def index():
     auth_url = "{}/?{}".format(SPOTIFY_AUTH_URL, url_args)
     return redirect(auth_url)
 
-    
 @app.route("/callback/q")
 def callback():
     # Auth Step 4: Requests refresh and access tokens
@@ -162,7 +265,16 @@ def callback():
 
     # Auth Step 6: Use the access token to access Spotify API
     authorization_header = {"Authorization": "Bearer {}".format(access_token)}
-    return render_template("index.html")
+
+    generate_all_plots()
+
+    top_artists_path = os.path.join('images', 'top_artists_plot.png')
+    top_tracks_path = os.path.join('images', 'top_tracks_plot.png')
+    recommended_countries_path = os.path.join('images', 'recommended_countries_plot.png')
+    return render_template("index2.html",
+                           top_artists_path=top_artists_path,
+                           top_tracks_path=top_tracks_path,
+                           recommended_countries_path=recommended_countries_path)
 
 @dash_app.callback(
     dash.dependencies.Output('top-artists-plot', 'figure'),
@@ -170,6 +282,14 @@ def callback():
     dash.dependencies.Output('recommended-countries-plot', 'figure'),
     [dash.dependencies.Input('update-button', 'n_clicks')]
 )
+
+
+@app.route('/top-artists-plot')
+def top_artists():
+    return render_template('index2.html', image_path='images/top_artists_plot.png')
+
+
+
 def update_plots(n_clicks):
     # Collect updated data
     user_listening_data = collect_user_listening_data()
@@ -230,73 +350,5 @@ dash_app.layout = html.Div([
 ])
 
 if __name__ == "__main__":
+    initialize_database()
     app.run(debug=True, port=PORT)
-
-
-'''
-user_listening_data = collect_user_listening_data()
-user_top_songs = collect_user_top_tracks()
-# Recommend countries based on user top songs
-country_scores = recommend_countries(user_top_songs)
-
-# Visualization 1: User's Top Artists
-top_artists_fig = go.Figure()
-top_artists_fig.add_trace(go.Bar(
-    x=list(range(1, len(user_listening_data['top_artists']) + 1)),
-    y=user_listening_data['top_artists'],
-    marker_color='rgb(55, 83, 109)'
-))
-top_artists_fig.update_layout(
-    title='Top Artists',
-    xaxis=dict(title='Rank'),
-    yaxis=dict(title='Artist Name'),
-    xaxis_tickangle=-45,
-    margin=dict(l=40, r=40, t=40, b=40)
-)
-
-# Visualization 2: User's Top Tracks
-top_tracks_fig = go.Figure()
-top_tracks_fig.add_trace(go.Bar(
-    x=list(range(1, len(user_listening_data['top_tracks']) + 1)),
-    y=user_top_songs,
-    marker_color='rgb(55, 83, 109)'
-))
-top_tracks_fig.update_layout(
-    title='Top Tracks',
-    xaxis=dict(title='Rank'),
-    yaxis=dict(title='Track Name'),
-    xaxis_tickangle=-45,
-    margin=dict(l=40, r=40, t=40, b=40)
-)
-
-# Visualization 3: Recommended Countries
-recommended_countries_fig = go.Figure()
-recommended_countries_fig.add_trace(go.Bar(
-    x=list(country_scores.keys()),
-    y=list(country_scores.values()),
-    marker_color='rgb(55, 83, 109)'
-))
-recommended_countries_fig.update_layout(
-    title='Recommended Countries Based on Listening History',
-    xaxis=dict(title='Country'),
-    yaxis=dict(title='Recommendation Strength'),
-    xaxis_tickangle=-45,
-    margin=dict(l=40, r=40, t=40, b=40)
-)
-
-
-app.layout = html.Div([
-    html.H1('Dash Plots'),
-    
-    html.Div([
-        dcc.Graph(figure=top_artists_fig),
-        dcc.Graph(figure=top_tracks_fig),
-        dcc.Graph(figure=recommended_countries_fig)
-    ])
-])
-
-
-if __name__ == "__main__":
-    app.run(debug=True, port=PORT)
-    
-'''

@@ -29,13 +29,44 @@
             background-color: #e9e9e9;
             padding: 10px;
             text-align: center;
+            display: flex; /* Use flexbox layout */
+            justify-content: center; /* Center content horizontally */
+            /* align-items: center; Center content vertically */
         }
     </style>
+
+    <script>
+        function updateVisualization() {
+            var select = document.getElementById('country-select');
+            var value = select.options[select.selectedIndex].value;
+            if (value === "") {
+                var visualizationDivs = document.querySelectorAll('.visualization-item');
+                visualizationDivs.forEach(function(div) {
+                    div.style.display = 'none';
+                });
+            } 
+            
+            else {
+                // Hide all visualization divs
+                var visualizationDivs = document.querySelectorAll('.visualization-item');
+                visualizationDivs.forEach(function(div) {
+                    div.style.display = 'none';
+                });
+
+                // Show the selected visualization div
+                var selectedVisualization = document.getElementById(value);
+                if (selectedVisualization) {
+                    selectedVisualization.style.display = 'block';
+                }
+            }
+        }
+    </script>
 </head>
+
 <body>
     <div class="container">
         <h1>Similarity to Different Countries</h1>
-        <label for="country-select">Choose a Country:</label>
+        <label for="country-select">See information about your Spotify Profile:</label>
         <select name="countries" id="country-select" onchange="updateVisualization()">
             <option value="">--Please choose an option--</option>
             <option value="top-artists-plot">Your Top Artists</option>
@@ -43,47 +74,31 @@
             <option value="recommended-countries-plot">Your Top Country Matches</option>
         </select>
         
-        <!-- Placeholders for visualizations -->
-        <div id="top-artists-plot" style="display: none;">
+    </div>
+    <!-- Container for visualizations -->
+    <div id="visualization">
+        <!-- Your visualization placeholders -->            
+        <div id="top-artists-plot" class="visualization-item">
             <h2>Your Top Artists</h2>
             <div id="top-artists-visualization">
-                <img src="{{ top_artists_path }}" alt="Top Artists Visualization">
+                <img src="/static/images/top_artists_plot.png" alt="Top Artists Visualization">
             </div>
         </div>
 
-        <div id="top-tracks-plot" style="display: none;">
+        <div id="top-tracks-plot" class="visualization-item">
             <h2>Your Top Songs</h2>
             <div id="top-tracks-visualization">
-                <img src="{{ top_tracks_path }}" alt="Top Tracks Visualization">
+                <img src="/static/images/top_songs_plot.png" alt="Top Songs Visualization">
             </div>
         </div>
 
-        <div id="recommended-countries-plot" style="display: none;">
+        <div id="recommended-countries-plot" class="visualization-item">
             <h2>Your Top Country Matches</h2>
             <div id="recommended-countries-visualization">
-                <img src="{{ recommended_countries_path }}" alt="Recommended Countries Visualization">
+                <img src="/static/images/top_countries_plot.png" alt="Recommended Countries Visualization">
             </div>
         </div>
     </div>
 
-    <script>
-        function updateVisualization() {
-            var select = document.getElementById('country-select');
-            var value = select.options[select.selectedIndex].value;
-    
-            // Hide all visualization placeholders
-            document.querySelectorAll('.visualization-placeholder').forEach(function(element) {
-                element.style.display = 'none';
-            });
-    
-            // Show the visualization placeholder corresponding to the selected option
-            if(value) {
-                var visualizationPlaceholder = document.getElementById(value);
-                if (visualizationPlaceholder) {
-                    visualizationPlaceholder.style.display = 'block';
-                }
-            }
-        }
-    </script>
 </body>
 </html>
